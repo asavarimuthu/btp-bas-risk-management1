@@ -38,5 +38,5 @@ entity Mitigations : managed
     description : String(100);
     owner : String(100);
     timeline : String(100);
-    test:String(100);
+    testBtpTraining:String(100);
 }
