@@ -17,6 +17,11 @@ annotate service.mitigation with @(
             Label : 'timeline',
             Value : timeline,
         },
+        {
+            $Type : 'UI.DataField',
+            Label : 'test',
+            Value : test,
+        },
     ]
 );
 annotate service.mitigation with @(
@@ -38,6 +43,11 @@ annotate service.mitigation with @(
                 Label : 'timeline',
                 Value : timeline,
             },
+            {
+            $Type : 'UI.DataField',
+            Label : 'test',
+            Value : test,
+        },
         ],
     },
     UI.Facets : [
