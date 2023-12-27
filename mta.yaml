@@ -1,0 +1,229 @@
+_schema-version: '3.1'
+ID: Riskmanagement_sap
+version: 1.0.0
+description: A simple CAP project.
+parameters:
+  deploy_mode: html5-repo
+  enable-parallel-deployments: true
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - rm -rf build/ui-deployer
+        - mkdir -p build/ui-deployer
+        - rm -rf build/dist
+        - mkdir -p build/dist
+    - builder: custom
+      commands:
+        - npm install --production
+        - >-
+          bash -c "cds -v | grep 'cds-dk' || npm i --production --no-save
+          @sap/cds-dk @sap/mdk-tools"
+        - bash -c "export PATH=$PATH:$(pwd)/node_modules/.bin"
+        - cds build --production
+modules:
+  - name: Riskmanagement_sap-Riskmanagementsap.Risks
+    type: html5
+    path: app/Riskmanagement_sap.Risks
+    build-parameters:
+      builder: custom
+      commands:
+        - rm -rf dist-zip dist
+        - >-
+          npx -p @ui5/cli ui5 build --dest dist
+          --include-task=generateManifestBundle
+          --include-task=generateCachebusterInfo
+        - mkdir dist-zip
+        - >-
+          bash -c "cd dist && npx bestzip ../dist-zip/RiskmanagementsapRisks.zip
+          *"
+      _artifactName: RiskmanagementsapRisks.zip
+      supported-platforms: []
+      build-result: dist-zip
+  - name: Riskmanagement_sap-Riskmanagementsap.mitigation
+    type: html5
+    path: app/Riskmanagement_sap.mitigation
+    build-parameters:
+      builder: custom
+      commands:
+        - rm -rf dist-zip dist
+        - >-
+          npx -p @ui5/cli ui5 build --dest dist
+          --include-task=generateManifestBundle
+          --include-task=generateCachebusterInfo
+        - mkdir dist-zip
+        - >-
+          bash -c "cd dist && npx bestzip
+          ../dist-zip/Riskmanagementsapmitigation.zip *"
+      _artifactName: Riskmanagementsapmitigation.zip
+      supported-platforms: []
+      build-result: dist-zip
+  - name: Riskmanagement_sap-db-deployer
+    type: hdb
+    path: gen/db
+    parameters:
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm
+      ignore:
+        - node_modules
+        - package-lock.json
+    requires:
+      - name: Riskmanagement_sap-service-uaa
+      - name: Riskmanagement_sap-service-db
+  - name: Riskmanagement_sap-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      memory: 256MB
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    build-parameters:
+      builder: npm
+      ignore:
+        - node_modules
+        - package-lock.json
+    requires:
+      - name: Riskmanagement_sap-service-uaa
+      - name: Riskmanagement_sap-service-db
+      - name: Riskmanagement_sap-service-destination
+      - name: Riskmanagement_sap-service-metadata
+      - name: Riskmanagement_sap-service-connectivity
+      - name: Riskmanagement_sap-service-logs
+  - name: Riskmanagement_sap-aux-destinations
+    type: com.sap.application.content
+    parameters:
+      content:
+        subaccount:
+          existing_destinations_policy: update
+          destinations:
+            - Authentication: OAuth2UserTokenExchange
+              Name: Riskmanagement_sap-service-uaa
+              ServiceInstanceName: Riskmanagement_sap-uaa
+              ServiceKeyName: Riskmanagement_sap-uaa-key
+              sap.cloud.service: lcap.Riskmanagement_sap
+            - Authentication: OAuth2UserTokenExchange
+              Name: Riskmanagement_sap-app-srv
+              TokenServiceInstanceName: Riskmanagement_sap-uaa
+              TokenServiceKeyName: Riskmanagement_sap-uaa-key
+              URL: ~{srv-api/srv-url}
+              sap.cloud.service: lcap.Riskmanagement_sap
+            - Name: Riskmanagement_sap-service-html5-apps-repo-host
+              ServiceInstanceName: Riskmanagement_sap-html5-apps-repo-host
+              ServiceKeyName: Riskmanagement_sap-html5-apps-repo-host-key
+              sap.cloud.service: lcap.Riskmanagement_sap
+    build-parameters:
+      no-source: true
+    requires:
+      - name: Riskmanagement_sap-service-uaa
+        parameters:
+          service-key:
+            name: Riskmanagement_sap-uaa-key
+      - name: srv-api
+      - name: Riskmanagement_sap-service-html5-apps-repo-host
+        parameters:
+          service-key:
+            name: Riskmanagement_sap-html5-apps-repo-host-key
+      - name: Riskmanagement_sap-service-destination
+        parameters:
+          content-target: true
+  - name: Riskmanagement_sap-launchpad
+    type: html5
+    path: build/launchpad
+    build-parameters:
+      builder: custom
+      commands:
+        - npm install
+        - >-
+          npx -p @ui5/cli ui5 build --dest dist
+          --include-task=generateManifestBundle
+          --include-task=generateCachebusterInfo
+        - bash -c "cd dist && npx bestzip ../../../build/dist/launchpad.zip *"
+        - rm -rf dist
+      _artifactName: launchpad.zip
+      supported-platforms: []
+      build-result: ../../build/dist
+  - name: Riskmanagement_sap-aux-ui-deployer
+    type: com.sap.application.content
+    path: build/ui-deployer
+    build-parameters:
+      build-result: resources
+      requires:
+        - name: Riskmanagement_sap-Riskmanagementsap.Risks
+          artifacts:
+            - RiskmanagementsapRisks.zip
+          target-path: resources
+        - name: Riskmanagement_sap-Riskmanagementsap.mitigation
+          artifacts:
+            - Riskmanagementsapmitigation.zip
+          target-path: resources
+        - name: Riskmanagement_sap-launchpad
+          artifacts:
+            - launchpad.zip
+          target-path: resources
+    requires:
+      - name: Riskmanagement_sap-service-html5-apps-repo-host
+        parameters:
+          content-target: true
+resources:
+  - type: org.cloudfoundry.managed-service
+    name: Riskmanagement_sap-service-uaa
+    parameters:
+      service: xsuaa
+      service-plan: application
+      service-name: Riskmanagement_sap-uaa
+      path: xs-security.json
+      config:
+        xsappname: Riskmanagement_sap-${space}
+        role-collections:
+          - description: ''
+            name: Riskmanagement_sap-RiskViewer-${space}
+            role-template-references:
+              - $XSAPPNAME.RiskViewer
+          - description: ''
+            name: Riskmanagement_sap-RiskManager-${space}
+            role-template-references:
+              - $XSAPPNAME.RiskManager
+  - type: org.cloudfoundry.managed-service
+    name: Riskmanagement_sap-service-db
+    parameters:
+      service: hana
+      service-plan: hdi-shared
+      service-name: Riskmanagement_sap-db
+  - type: org.cloudfoundry.managed-service
+    name: Riskmanagement_sap-service-destination
+    parameters:
+      service: destination
+      service-plan: lite
+      service-name: Riskmanagement_sap-destination
+      config:
+        HTML5Runtime_enabled: true
+        version: 1.0.0
+  - type: org.cloudfoundry.user-provided-service
+    name: Riskmanagement_sap-service-metadata
+    parameters:
+      service: metadata
+      service-plan: standard
+      service-name: Riskmanagement_sap-metadata
+      config:
+        default-domain: ${default-domain}
+  - type: org.cloudfoundry.managed-service
+    name: Riskmanagement_sap-service-connectivity
+    parameters:
+      service: connectivity
+      service-plan: lite
+      service-name: Riskmanagement_sap-connectivity
+  - type: org.cloudfoundry.managed-service
+    name: Riskmanagement_sap-service-logs
+    parameters:
+      service: application-logs
+      service-plan: lite
+      service-name: Riskmanagement_sap-logs
+  - type: org.cloudfoundry.managed-service
+    name: Riskmanagement_sap-service-html5-apps-repo-host
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+      service-name: Riskmanagement_sap-html5-apps-repo-host
