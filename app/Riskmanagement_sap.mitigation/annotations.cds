@@ -19,8 +19,8 @@ annotate service.mitigation with @(
         },
         {
             $Type : 'UI.DataField',
-            Label : 'test',
-            Value : test,
+            Label : 'testBtpTraining',
+            Value : testBtpTraining,
         },
     ]
 );
@@ -45,8 +45,8 @@ annotate service.mitigation with @(
             },
             {
             $Type : 'UI.DataField',
-            Label : 'test',
-            Value : test,
+            Label : 'testBtpTraining',
+            Value : testBtpTraining,
         },
         ],
     },
